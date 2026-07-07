@@ -1,0 +1,8 @@
+﻿Tiêu chí,Giá trị,Nhận xét
+Tổng số Track ID phát hiện,533,Thể hiện số lượng phương tiện/đối tượng được tracker gán ID trong toàn video.
+Số phương tiện đo được tốc độ,76,Chỉ tính các xe đi qua đủ LINE_A và LINE_B.
+Số phương tiện vi phạm tốc độ,32,Các xe có tốc độ ước lượng vượt ngưỡng cho phép.
+Tỷ lệ vi phạm,42.11%,Tỷ lệ xe vi phạm trên tổng số xe đo được tốc độ.
+Tốc độ trung bình,48.64 km/h,Tốc độ trung bình của các phương tiện đã đo được.
+Tốc độ lớn nhất,84.37 km/h,Tốc độ cao nhất được hệ thống ghi nhận.
+FPS xử lý thực tế,90.93 FPS,"Tốc độ xử lý video của hệ thống, dùng để đánh giá khả năng realtime."

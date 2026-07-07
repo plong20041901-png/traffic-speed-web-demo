@@ -1,0 +1,2 @@
+﻿video_path,output_video_path,model_path,video_fps,video_width,video_height,total_frames,processing_time_sec,real_processing_fps,distance_meters,speed_limit_kmh,total_unique_vehicle_ids,total_measured_vehicles,total_violations
+/content/drive/MyDrive/7997852520995.mp4,/content/drive/MyDrive/TRAFFIC_PROJECT_DELIVERABLES/demo/videos/demo_tracking_speed_violation.mp4,/content/drive/MyDrive/TRAFFIC_PROJECT_DELIVERABLES/models/best.pt,25.0,1280,720,3026,33.28,90.93,15.0,50.0,533,76,32
