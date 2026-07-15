@@ -1,3 +1,93 @@
+# ==============================================================================
+# PHASE 8.2 - TẠO FILE INDEX.HTML CHO WEB DASHBOARD
+# ==============================================================================
+
+from pathlib import Path
+import pandas as pd
+
+print("=" * 100)
+print("PHASE 8.2 - TẠO INDEX.HTML")
+print("=" * 100)
+
+WEB_DIR = Path("/content/drive/MyDrive/TRAFFIC_PROJECT_FINAL_PACKAGE/10_web_demo")
+ASSETS_DIR = WEB_DIR / "assets"
+EVIDENCE_WEB_DIR = ASSETS_DIR / "evidence"
+index_path = WEB_DIR / "index.html"
+
+# DÁN LẠI LINK GOOGLE DRIVE VIDEO DEMO Ở ĐÂY
+GOOGLE_DRIVE_VIDEO_LINK = "DAN_LINK_GOOGLE_DRIVE_VIDEO_DEMO_DA_XU_LY_VAO_DAY"
+
+# ------------------------------------------------------------------------------
+# Đọc summary
+# ------------------------------------------------------------------------------
+
+summary_path = ASSETS_DIR / "demo_summary.csv"
+speed_csv_path = ASSETS_DIR / "speed_violation_results.csv"
+class_eval_path = ASSETS_DIR / "class_evaluation_summary.csv"
+
+summary = {}
+df_speed = pd.DataFrame()
+df_class = pd.DataFrame()
+
+if summary_path.exists():
+    df_summary = pd.read_csv(summary_path)
+    if len(df_summary) > 0:
+        summary = df_summary.iloc[0].to_dict()
+
+if speed_csv_path.exists():
+    df_speed = pd.read_csv(speed_csv_path)
+
+if class_eval_path.exists():
+    df_class = pd.read_csv(class_eval_path)
+
+total_ids = int(summary.get("total_unique_vehicle_ids", 0))
+total_measured = int(summary.get("total_measured_vehicles", 0))
+total_violations = int(summary.get("total_violations", 0))
+real_fps = float(summary.get("real_processing_fps", 0))
+speed_limit = float(summary.get("speed_limit_kmh", 50))
+distance_m = float(summary.get("distance_meters", 15))
+
+avg_speed = round(df_speed["speed_kmh"].mean(), 2) if not df_speed.empty and "speed_kmh" in df_speed.columns else 0
+max_speed = round(df_speed["speed_kmh"].max(), 2) if not df_speed.empty and "speed_kmh" in df_speed.columns else 0
+violation_rate = round(total_violations / total_measured * 100, 2) if total_measured > 0 else 0
+
+# ------------------------------------------------------------------------------
+# HTML bảng speed log
+# ------------------------------------------------------------------------------
+
+if not df_speed.empty:
+    display_cols = [c for c in [
+        "track_id", "class_name", "speed_kmh", "speed_limit_kmh",
+        "is_violation", "time_sec", "frame_idx"
+    ] if c in df_speed.columns]
+    latest_html = df_speed[display_cols].head(12).to_html(index=False, classes="data-table")
+else:
+    latest_html = "<p>Chưa có dữ liệu đo tốc độ.</p>"
+
+if not df_class.empty:
+    class_table_html = df_class.to_html(index=False, classes="data-table")
+else:
+    class_table_html = "<p>Chưa có dữ liệu thống kê theo class.</p>"
+
+# ------------------------------------------------------------------------------
+# HTML evidence
+# ------------------------------------------------------------------------------
+
+evidence_imgs = sorted(list(EVIDENCE_WEB_DIR.glob("*.jpg")))
+
+if len(evidence_imgs) == 0:
+    evidence_html = "<p>Chưa có ảnh bằng chứng.</p>"
+else:
+    evidence_html = ""
+    for img in evidence_imgs[:8]:
+        evidence_html += f"""
+        <div class="evidence-card">
+            <img src="assets/evidence/{img.name}" alt="Evidence">
+            <p>{img.name}</p>
+        </div>
+        """
+
+html = f"""
 <!DOCTYPE html>
 <html lang="vi">
 <head>
@@ -6,18 +96,18 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
     <style>
-        * {
+        * {{
             box-sizing: border-box;
-        }
+        }}
 
-        body {
+        body {{
             margin: 0;
             font-family: Arial, Helvetica, sans-serif;
             background: #0b1120;
             color: #e5e7eb;
-        }
+        }}
 
-        .topbar {
+        .topbar {{
             min-height: 72px;
             background: linear-gradient(90deg, #0f172a, #1e3a8a);
             display: flex;
@@ -25,90 +115,74 @@
             justify-content: space-between;
             padding: 18px 28px;
             border-bottom: 1px solid rgba(255,255,255,0.12);
-        }
+        }}
 
-        .topbar h1 {
+        .topbar h1 {{
             font-size: 24px;
             margin: 0;
-        }
+        }}
 
-        .badge {
+        .badge {{
             background: #22c55e;
             color: #04130a;
             padding: 8px 14px;
             border-radius: 999px;
             font-weight: bold;
             font-size: 14px;
-        }
+        }}
 
-        .layout {
+        .layout {{
             display: grid;
             grid-template-columns: 2.2fr 1fr;
             gap: 18px;
             padding: 18px;
-        }
+        }}
 
-        .panel {
+        .panel {{
             background: #111827;
             border: 1px solid rgba(255,255,255,0.12);
             border-radius: 16px;
             box-shadow: 0 8px 28px rgba(0,0,0,0.28);
             overflow: hidden;
-        }
+        }}
 
-        .panel-header {
+        .panel-header {{
             padding: 14px 18px;
             background: #182235;
             border-bottom: 1px solid rgba(255,255,255,0.10);
             display: flex;
             align-items: center;
             justify-content: space-between;
-        }
+        }}
 
-        .panel-header h2 {
+        .panel-header h2 {{
             margin: 0;
             font-size: 18px;
-        }
+        }}
 
-        .panel-body {
+        .panel-body {{
             padding: 16px;
-        }
+        }}
 
-        .video-placeholder {
+        .video-placeholder {{
             background: #020617;
-            padding: 28px;
+            padding: 48px 28px;
             text-align: center;
             border-radius: 14px;
             border: 1px solid rgba(255,255,255,0.12);
-        }
+        }}
 
-        .video-placeholder h2 {
+        .video-placeholder h2 {{
             color: white;
             margin-top: 0;
-        }
+        }}
 
-        .video-placeholder p {
+        .video-placeholder p {{
             color: #94a3b8;
             line-height: 1.6;
-        }
+        }}
 
-        .video-box {
-            width: 100%;
-            border-radius: 14px;
-            overflow: hidden;
-            border: 1px solid rgba(255,255,255,0.12);
-            background: #020617;
-            margin-top: 18px;
-        }
-
-        .video-box iframe {
-            display: block;
-            width: 100%;
-            height: 520px;
-            border: none;
-        }
-
-        .btn {
+        .btn {{
             display: inline-block;
             text-decoration: none;
             color: white;
@@ -118,159 +192,151 @@
             font-weight: bold;
             border: 1px solid rgba(255,255,255,0.12);
             margin: 6px;
-        }
+        }}
 
-        .btn:hover {
+        .btn:hover {{
             background: #1d4ed8;
-        }
+        }}
 
-        .btn-yellow {
+        .btn-yellow {{
             background: #ca8a04;
-        }
+        }}
 
-        .btn-yellow:hover {
-            background: #a16207;
-        }
-
-        .metric-grid {
+        .metric-grid {{
             display: grid;
             grid-template-columns: repeat(2, 1fr);
             gap: 12px;
-        }
+        }}
 
-        .metric {
+        .metric {{
             background: #0f172a;
             border: 1px solid rgba(255,255,255,0.10);
             border-radius: 14px;
             padding: 16px;
-        }
+        }}
 
-        .metric .label {
+        .metric .label {{
             color: #94a3b8;
             font-size: 13px;
             margin-bottom: 8px;
-        }
+        }}
 
-        .metric .value {
+        .metric .value {{
             font-size: 28px;
             font-weight: bold;
             color: #f8fafc;
-        }
+        }}
 
-        .unit {
+        .unit {{
             color: #38bdf8;
             font-size: 14px;
             margin-left: 4px;
-        }
+        }}
 
-        .danger {
+        .danger {{
             color: #f87171 !important;
-        }
+        }}
 
-        .bottom-grid {
+        .bottom-grid {{
             display: grid;
             grid-template-columns: repeat(3, 1fr);
             gap: 18px;
             padding: 0 18px 18px;
-        }
+        }}
 
-        .full-width {
+        .full-width {{
             padding: 0 18px 18px;
-        }
+        }}
 
-        .result-img {
+        .result-img {{
             width: 100%;
             border-radius: 10px;
             background: white;
             border: 1px solid rgba(255,255,255,0.10);
-        }
+        }}
 
-        .data-table {
+        .data-table {{
             width: 100%;
             border-collapse: collapse;
             font-size: 13px;
             color: #e5e7eb;
-        }
+        }}
 
-        .data-table th {
+        .data-table th {{
             background: #1e293b;
             color: #93c5fd;
             padding: 9px;
             border: 1px solid rgba(255,255,255,0.12);
             text-align: left;
-        }
+        }}
 
-        .data-table td {
+        .data-table td {{
             padding: 8px;
             border: 1px solid rgba(255,255,255,0.10);
-        }
+        }}
 
-        .data-table tr:nth-child(even) {
+        .data-table tr:nth-child(even) {{
             background: #0f172a;
-        }
+        }}
 
-        .evidence-grid {
+        .evidence-grid {{
             display: grid;
             grid-template-columns: repeat(4, 1fr);
             gap: 14px;
-        }
+        }}
 
-        .evidence-card {
+        .evidence-card {{
             background: #0f172a;
             border: 1px solid rgba(255,255,255,0.10);
             border-radius: 12px;
             padding: 10px;
-        }
+        }}
 
-        .evidence-card img {
+        .evidence-card img {{
             width: 100%;
             border-radius: 8px;
-        }
+        }}
 
-        .evidence-card p {
+        .evidence-card p {{
             font-size: 11px;
             color: #94a3b8;
             word-break: break-all;
-        }
+        }}
 
-        .note {
+        .note {{
             color: #94a3b8;
             line-height: 1.6;
-        }
+        }}
 
-        .footer {
+        .footer {{
             text-align: center;
             padding: 24px;
             color: #94a3b8;
-        }
+        }}
 
-        @media (max-width: 1000px) {
-            .layout {
+        @media (max-width: 1000px) {{
+            .layout {{
                 grid-template-columns: 1fr;
-            }
+            }}
 
-            .bottom-grid {
+            .bottom-grid {{
                 grid-template-columns: 1fr;
-            }
+            }}
 
-            .evidence-grid {
+            .evidence-grid {{
                 grid-template-columns: repeat(2, 1fr);
-            }
-        }
+            }}
+        }}
 
-        @media (max-width: 600px) {
-            .metric-grid {
+        @media (max-width: 600px) {{
+            .metric-grid {{
                 grid-template-columns: 1fr;
-            }
+            }}
 
-            .evidence-grid {
+            .evidence-grid {{
                 grid-template-columns: 1fr;
-            }
-
-            .video-box iframe {
-                height: 320px;
-            }
-        }
+            }}
+        }}
     </style>
 </head>
 
@@ -292,33 +358,12 @@
             <div class="panel-body">
                 <div class="video-placeholder">
                     <h2>🎥 Video Demo Hệ Thống</h2>
-
                     <p>
                         Video demo đã được xử lý bằng mô hình YOLO + ByteTrack.
                         Video hiển thị Bounding Box, Track ID, tốc độ ước lượng và cảnh báo vi phạm.
                     </p>
-
-                    <div class="video-box">
-                        <iframe
-                            src="https://drive.google.com/file/d/1GexFRoD9pxu1xvmApD7nsGtpLXI9NiiI/preview"
-                            allow="autoplay"
-                            allowfullscreen>
-                        </iframe>
-                    </div>
-
-                    <div style="margin-top: 18px;">
-                        <a class="btn"
-                           href="https://drive.google.com/file/d/1GexFRoD9pxu1xvmApD7nsGtpLXI9NiiI/view?usp=sharing"
-                           target="_blank">
-                            🎬 Mở video trên Google Drive
-                        </a>
-
-                        <a class="btn btn-yellow"
-                           href="assets/speed_violation_results.csv"
-                           download>
-                            ⬇ Tải CSV kết quả
-                        </a>
-                    </div>
+                    <a class="btn" href="{GOOGLE_DRIVE_VIDEO_LINK}" target="_blank">▶ Xem video demo trên Google Drive</a>
+                    <a class="btn btn-yellow" href="assets/speed_violation_results.csv" download>⬇ Tải CSV kết quả</a>
                 </div>
 
                 <p class="note">
@@ -338,47 +383,47 @@
                 <div class="metric-grid">
                     <div class="metric">
                         <div class="label">Tổng Track ID</div>
-                        <div class="value">533</div>
+                        <div class="value">{total_ids}</div>
                     </div>
 
                     <div class="metric">
                         <div class="label">Xe đo tốc độ</div>
-                        <div class="value">76</div>
+                        <div class="value">{total_measured}</div>
                     </div>
 
                     <div class="metric">
                         <div class="label">Xe vi phạm</div>
-                        <div class="value danger">32</div>
+                        <div class="value danger">{total_violations}</div>
                     </div>
 
                     <div class="metric">
                         <div class="label">Tỷ lệ vi phạm</div>
-                        <div class="value danger">42.11<span class="unit">%</span></div>
+                        <div class="value danger">{violation_rate}<span class="unit">%</span></div>
                     </div>
 
                     <div class="metric">
                         <div class="label">FPS xử lý</div>
-                        <div class="value">90.93<span class="unit">FPS</span></div>
+                        <div class="value">{real_fps}<span class="unit">FPS</span></div>
                     </div>
 
                     <div class="metric">
                         <div class="label">Speed Limit</div>
-                        <div class="value">50<span class="unit">km/h</span></div>
+                        <div class="value">{speed_limit:.0f}<span class="unit">km/h</span></div>
                     </div>
 
                     <div class="metric">
                         <div class="label">Tốc độ TB</div>
-                        <div class="value">48.64<span class="unit">km/h</span></div>
+                        <div class="value">{avg_speed}<span class="unit">km/h</span></div>
                     </div>
 
                     <div class="metric">
                         <div class="label">Tốc độ Max</div>
-                        <div class="value danger">84.37<span class="unit">km/h</span></div>
+                        <div class="value danger">{max_speed}<span class="unit">km/h</span></div>
                     </div>
                 </div>
 
                 <p class="note">
-                    Khoảng cách giả định giữa hai vạch ảo: <b>15.0 m</b>.
+                    Khoảng cách giả định giữa hai vạch ảo: <b>{distance_m:.1f} m</b>.
                 </p>
             </div>
         </div>
@@ -422,31 +467,7 @@
                 <h2>📋 Latest Speed Logs</h2>
             </div>
             <div class="panel-body">
-                <table class="data-table">
-                    <thead>
-                        <tr>
-                            <th>track_id</th>
-                            <th>class_name</th>
-                            <th>speed_kmh</th>
-                            <th>speed_limit_kmh</th>
-                            <th>is_violation</th>
-                            <th>time_sec</th>
-                            <th>frame_idx</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <tr><td>16</td><td>motorcycle</td><td>75.00</td><td>50.0</td><td>True</td><td>1.36</td><td>34</td></tr>
-                        <tr><td>4</td><td>motorcycle</td><td>40.91</td><td>50.0</td><td>False</td><td>2.12</td><td>53</td></tr>
-                        <tr><td>22</td><td>motorcycle</td><td>54.00</td><td>50.0</td><td>True</td><td>2.96</td><td>74</td></tr>
-                        <tr><td>6</td><td>motorcycle</td><td>50.00</td><td>50.0</td><td>False</td><td>3.12</td><td>78</td></tr>
-                        <tr><td>45</td><td>motorcycle</td><td>67.50</td><td>50.0</td><td>True</td><td>3.20</td><td>80</td></tr>
-                        <tr><td>84</td><td>car</td><td>48.21</td><td>50.0</td><td>False</td><td>5.04</td><td>126</td></tr>
-                        <tr><td>137</td><td>motorcycle</td><td>75.00</td><td>50.0</td><td>True</td><td>7.60</td><td>190</td></tr>
-                        <tr><td>126</td><td>motorcycle</td><td>67.50</td><td>50.0</td><td>True</td><td>7.68</td><td>192</td></tr>
-                        <tr><td>148</td><td>car</td><td>54.00</td><td>50.0</td><td>True</td><td>8.60</td><td>215</td></tr>
-                        <tr><td>186</td><td>motorcycle</td><td>84.37</td><td>50.0</td><td>True</td><td>9.56</td><td>239</td></tr>
-                    </tbody>
-                </table>
+                {latest_html}
             </div>
         </div>
     </div>
@@ -457,23 +478,7 @@
                 <h2>📌 Class Evaluation Summary</h2>
             </div>
             <div class="panel-body">
-                <table class="data-table">
-                    <thead>
-                        <tr>
-                            <th>class_name</th>
-                            <th>total_measured</th>
-                            <th>total_violations</th>
-                            <th>avg_speed_kmh</th>
-                            <th>max_speed_kmh</th>
-                            <th>min_speed_kmh</th>
-                            <th>violation_rate_%</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <tr><td>car</td><td>18</td><td>4</td><td>43.20</td><td>79.41</td><td>25.00</td><td>22.22</td></tr>
-                        <tr><td>motorcycle</td><td>58</td><td>28</td><td>50.33</td><td>84.37</td><td>12.39</td><td>48.28</td></tr>
-                    </tbody>
-                </table>
+                {class_table_html}
             </div>
         </div>
     </div>
@@ -516,25 +521,7 @@
             </div>
             <div class="panel-body">
                 <div class="evidence-grid">
-                    <div class="evidence-card">
-                        <img src="assets/evidence/violation_id_1089_speed_56.2_time_53.76s.jpg" alt="Evidence">
-                        <p>violation_id_1089_speed_56.2_time_53.76s.jpg</p>
-                    </div>
-
-                    <div class="evidence-card">
-                        <img src="assets/evidence/violation_id_1132_speed_54.0_time_56.72s.jpg" alt="Evidence">
-                        <p>violation_id_1132_speed_54.0_time_56.72s.jpg</p>
-                    </div>
-
-                    <div class="evidence-card">
-                        <img src="assets/evidence/violation_id_1178_speed_67.5_time_56.92s.jpg" alt="Evidence">
-                        <p>violation_id_1178_speed_67.5_time_56.92s.jpg</p>
-                    </div>
-
-                    <div class="evidence-card">
-                        <img src="assets/evidence/violation_id_1189_speed_54.0_time_57.92s.jpg" alt="Evidence">
-                        <p>violation_id_1189_speed_54.0_time_57.92s.jpg</p>
-                    </div>
+                    {evidence_html}
                 </div>
             </div>
         </div>
@@ -561,3 +548,9 @@
 
 </body>
 </html>
+"""
+
+index_path.write_text(html, encoding="utf-8")
+
+print("Đã tạo index.html:")
+print(index_path)
