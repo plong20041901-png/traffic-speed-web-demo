@@ -3,233 +3,606 @@
 # ==============================================================================
 
 from pathlib import Path
+import html as html_module
 import pandas as pd
+
+
+# ==============================================================================
+# 1. CẤU HÌNH ĐƯỜNG DẪN
+# ==============================================================================
 
 print("=" * 100)
 print("PHASE 8.2 - TẠO INDEX.HTML")
 print("=" * 100)
 
-WEB_DIR = Path("/content/drive/MyDrive/TRAFFIC_PROJECT_FINAL_PACKAGE/10_web_demo")
+WEB_DIR = Path(
+    "/content/drive/MyDrive/"
+    "TRAFFIC_PROJECT_FINAL_PACKAGE/10_web_demo"
+)
+
 ASSETS_DIR = WEB_DIR / "assets"
 EVIDENCE_WEB_DIR = ASSETS_DIR / "evidence"
-index_path = WEB_DIR / "index.html"
+INDEX_PATH = WEB_DIR / "index.html"
 
-# DÁN LẠI LINK GOOGLE DRIVE VIDEO DEMO Ở ĐÂY
-GOOGLE_DRIVE_VIDEO_LINK = "/content/drive/MyDrive/demo_tracking_speed_violation.mp4"
+# Tạo thư mục nếu chưa tồn tại
+WEB_DIR.mkdir(parents=True, exist_ok=True)
+ASSETS_DIR.mkdir(parents=True, exist_ok=True)
+EVIDENCE_WEB_DIR.mkdir(parents=True, exist_ok=True)
 
-# ------------------------------------------------------------------------------
-# Đọc summary
-# ------------------------------------------------------------------------------
 
-summary_path = ASSETS_DIR / "demo_summary.csv"
-speed_csv_path = ASSETS_DIR / "speed_violation_results.csv"
-class_eval_path = ASSETS_DIR / "class_evaluation_summary.csv"
+# ==============================================================================
+# 2. LINK VIDEO GOOGLE DRIVE
+# ==============================================================================
+
+# ID được lấy từ link:
+# https://drive.google.com/file/d/1GexFRoD9pxu1xvmApD7nsGtpLXI9NiiI/view
+
+GOOGLE_DRIVE_FILE_ID = "1GexFRoD9pxu1xvmApD7nsGtpLXI9NiiI"
+
+# Link mở video trong Google Drive
+GOOGLE_DRIVE_VIDEO_LINK = (
+    f"https://drive.google.com/file/d/"
+    f"{GOOGLE_DRIVE_FILE_ID}/view?usp=sharing"
+)
+
+# Link dùng để nhúng video trực tiếp lên website
+GOOGLE_DRIVE_VIDEO_EMBED = (
+    f"https://drive.google.com/file/d/"
+    f"{GOOGLE_DRIVE_FILE_ID}/preview"
+)
+
+
+# ==============================================================================
+# 3. ĐƯỜNG DẪN CÁC FILE DỮ LIỆU
+# ==============================================================================
+
+SUMMARY_PATH = ASSETS_DIR / "demo_summary.csv"
+SPEED_CSV_PATH = ASSETS_DIR / "speed_violation_results.csv"
+CLASS_EVAL_PATH = ASSETS_DIR / "class_evaluation_summary.csv"
+
+
+# ==============================================================================
+# 4. HÀM ĐỌC CSV AN TOÀN
+# ==============================================================================
+
+def read_csv_safe(file_path: Path) -> pd.DataFrame:
+    """
+    Đọc file CSV an toàn.
+
+    Trả về DataFrame rỗng khi:
+    - File không tồn tại.
+    - File có dung lượng bằng 0.
+    - File bị lỗi định dạng.
+    """
+
+    if not file_path.exists():
+        print(f"⚠️ Không tìm thấy file: {file_path.name}")
+        return pd.DataFrame()
+
+    if file_path.stat().st_size == 0:
+        print(f"⚠️ File đang rỗng: {file_path.name}")
+        return pd.DataFrame()
+
+    try:
+        dataframe = pd.read_csv(file_path)
+        print(
+            f"✅ Đã đọc {file_path.name}: "
+            f"{len(dataframe)} dòng, {len(dataframe.columns)} cột"
+        )
+        return dataframe
+
+    except pd.errors.EmptyDataError:
+        print(f"⚠️ File không có dữ liệu: {file_path.name}")
+        return pd.DataFrame()
+
+    except Exception as error:
+        print(f"❌ Lỗi đọc {file_path.name}: {error}")
+        return pd.DataFrame()
+
+
+# Đọc dữ liệu
+df_summary = read_csv_safe(SUMMARY_PATH)
+df_speed = read_csv_safe(SPEED_CSV_PATH)
+df_class = read_csv_safe(CLASS_EVAL_PATH)
+
+
+# ==============================================================================
+# 5. HÀM CHUYỂN ĐỔI GIÁ TRỊ AN TOÀN
+# ==============================================================================
+
+def safe_int(value, default=0):
+    """Chuyển dữ liệu sang số nguyên an toàn."""
+
+    try:
+        if pd.isna(value):
+            return default
+
+        return int(float(value))
+
+    except (TypeError, ValueError):
+        return default
+
+
+def safe_float(value, default=0.0):
+    """Chuyển dữ liệu sang số thực an toàn."""
+
+    try:
+        if pd.isna(value):
+            return default
+
+        return float(value)
+
+    except (TypeError, ValueError):
+        return default
+
+
+# ==============================================================================
+# 6. LẤY DỮ LIỆU SUMMARY
+# ==============================================================================
 
 summary = {}
-df_speed = pd.DataFrame()
-df_class = pd.DataFrame()
 
-if summary_path.exists():
-    df_summary = pd.read_csv(summary_path)
-    if len(df_summary) > 0:
-        summary = df_summary.iloc[0].to_dict()
+if not df_summary.empty:
+    summary = df_summary.iloc[0].to_dict()
 
-if speed_csv_path.exists():
-    df_speed = pd.read_csv(speed_csv_path)
 
-if class_eval_path.exists():
-    df_class = pd.read_csv(class_eval_path)
+total_ids = safe_int(
+    summary.get("total_unique_vehicle_ids", 0)
+)
 
-total_ids = int(summary.get("total_unique_vehicle_ids", 0))
-total_measured = int(summary.get("total_measured_vehicles", 0))
-total_violations = int(summary.get("total_violations", 0))
-real_fps = float(summary.get("real_processing_fps", 0))
-speed_limit = float(summary.get("speed_limit_kmh", 50))
-distance_m = float(summary.get("distance_meters", 15))
+total_measured = safe_int(
+    summary.get("total_measured_vehicles", 0)
+)
 
-avg_speed = round(df_speed["speed_kmh"].mean(), 2) if not df_speed.empty and "speed_kmh" in df_speed.columns else 0
-max_speed = round(df_speed["speed_kmh"].max(), 2) if not df_speed.empty and "speed_kmh" in df_speed.columns else 0
-violation_rate = round(total_violations / total_measured * 100, 2) if total_measured > 0 else 0
+total_violations = safe_int(
+    summary.get("total_violations", 0)
+)
 
-# ------------------------------------------------------------------------------
-# HTML bảng speed log
-# ------------------------------------------------------------------------------
+real_fps = safe_float(
+    summary.get("real_processing_fps", 0)
+)
+
+speed_limit = safe_float(
+    summary.get("speed_limit_kmh", 50),
+    default=50
+)
+
+distance_m = safe_float(
+    summary.get("distance_meters", 15),
+    default=15
+)
+
+
+# ==============================================================================
+# 7. TÍNH TOÁN THỐNG KÊ TỐC ĐỘ
+# ==============================================================================
+
+avg_speed = 0
+max_speed = 0
+
+if not df_speed.empty and "speed_kmh" in df_speed.columns:
+
+    speed_values = pd.to_numeric(
+        df_speed["speed_kmh"],
+        errors="coerce"
+    ).dropna()
+
+    if not speed_values.empty:
+        avg_speed = round(float(speed_values.mean()), 2)
+        max_speed = round(float(speed_values.max()), 2)
+
+
+if total_measured > 0:
+    violation_rate = round(
+        total_violations / total_measured * 100,
+        2
+    )
+else:
+    violation_rate = 0
+
+
+# ==============================================================================
+# 8. TẠO BẢNG HTML SPEED LOG
+# ==============================================================================
 
 if not df_speed.empty:
-    display_cols = [c for c in [
-        "track_id", "class_name", "speed_kmh", "speed_limit_kmh",
-        "is_violation", "time_sec", "frame_idx"
-    ] if c in df_speed.columns]
-    latest_html = df_speed[display_cols].head(12).to_html(index=False, classes="data-table")
+
+    desired_columns = [
+        "track_id",
+        "class_name",
+        "speed_kmh",
+        "speed_limit_kmh",
+        "is_violation",
+        "time_sec",
+        "frame_idx"
+    ]
+
+    display_columns = [
+        column
+        for column in desired_columns
+        if column in df_speed.columns
+    ]
+
+    if display_columns:
+
+        latest_speed_df = (
+            df_speed[display_columns]
+            .tail(12)
+            .iloc[::-1]
+        )
+
+        latest_html = latest_speed_df.to_html(
+            index=False,
+            classes="data-table",
+            border=0,
+            justify="left"
+        )
+
+    else:
+        latest_html = """
+        <p class="empty-message">
+            File speed_violation_results.csv chưa có các cột cần hiển thị.
+        </p>
+        """
+
 else:
-    latest_html = "<p>Chưa có dữ liệu đo tốc độ.</p>"
+    latest_html = """
+    <p class="empty-message">
+        Chưa có dữ liệu đo tốc độ.
+    </p>
+    """
+
+
+# ==============================================================================
+# 9. TẠO BẢNG HTML CLASS EVALUATION
+# ==============================================================================
 
 if not df_class.empty:
-    class_table_html = df_class.to_html(index=False, classes="data-table")
+
+    class_table_html = df_class.to_html(
+        index=False,
+        classes="data-table",
+        border=0,
+        justify="left"
+    )
+
 else:
-    class_table_html = "<p>Chưa có dữ liệu thống kê theo class.</p>"
+    class_table_html = """
+    <p class="empty-message">
+        Chưa có dữ liệu thống kê theo lớp phương tiện.
+    </p>
+    """
 
-# ------------------------------------------------------------------------------
-# HTML evidence
-# ------------------------------------------------------------------------------
 
-evidence_imgs = sorted(list(EVIDENCE_WEB_DIR.glob("*.jpg")))
+# ==============================================================================
+# 10. TẠO HTML ẢNH BẰNG CHỨNG
+# ==============================================================================
 
-if len(evidence_imgs) == 0:
-    evidence_html = "<p>Chưa có ảnh bằng chứng.</p>"
+evidence_images = []
+
+supported_extensions = [
+    "*.jpg",
+    "*.jpeg",
+    "*.png",
+    "*.webp"
+]
+
+for extension in supported_extensions:
+    evidence_images.extend(
+        EVIDENCE_WEB_DIR.glob(extension)
+    )
+
+# Loại bỏ trùng lặp và sắp xếp theo tên
+evidence_images = sorted(
+    set(evidence_images),
+    key=lambda image_path: image_path.name.lower()
+)
+
+
+if len(evidence_images) == 0:
+
+    evidence_html = """
+    <p class="empty-message">
+        Chưa có ảnh bằng chứng.
+    </p>
+    """
+
 else:
-    evidence_html = ""
-    for img in evidence_imgs[:8]:
-        evidence_html += f"""
-        <div class="evidence-card">
-            <img src="assets/evidence/{img.name}" alt="Evidence">
-            <p>{img.name}</p>
-        </div>
-        """
+
+    evidence_cards = []
+
+    for image_path in evidence_images[:8]:
+
+        safe_filename = html_module.escape(
+            image_path.name
+        )
+
+        evidence_cards.append(
+            f"""
+            <article class="evidence-card">
+                <img
+                    src="assets/evidence/{safe_filename}"
+                    alt="Ảnh bằng chứng {safe_filename}"
+                    loading="lazy"
+                >
+                <p>{safe_filename}</p>
+            </article>
+            """
+        )
+
+    evidence_html = "\n".join(evidence_cards)
+
+
+# ==============================================================================
+# 11. TẠO NỘI DUNG FILE HTML
+# ==============================================================================
 
 html = f"""
 <!DOCTYPE html>
 <html lang="vi">
+
 <head>
+
     <meta charset="UTF-8">
-    <title>Traffic Speed Violation Dashboard</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0"
+    >
+
+    <meta
+        name="description"
+        content="Traffic Speed Violation Monitoring Dashboard sử dụng YOLO và ByteTrack"
+    >
+
+    <title>
+        Traffic Speed Violation Dashboard
+    </title>
 
     <style>
+
         * {{
             box-sizing: border-box;
         }}
 
+        html {{
+            scroll-behavior: smooth;
+        }}
+
         body {{
             margin: 0;
-            font-family: Arial, Helvetica, sans-serif;
+            min-height: 100vh;
+
+            font-family:
+                Arial,
+                Helvetica,
+                sans-serif;
+
             background: #0b1120;
             color: #e5e7eb;
         }}
 
+        img {{
+            display: block;
+        }}
+
         .topbar {{
             min-height: 72px;
-            background: linear-gradient(90deg, #0f172a, #1e3a8a);
+
+            background:
+                linear-gradient(
+                    90deg,
+                    #0f172a,
+                    #1e3a8a
+                );
+
             display: flex;
             align-items: center;
             justify-content: space-between;
+            gap: 16px;
+
             padding: 18px 28px;
-            border-bottom: 1px solid rgba(255,255,255,0.12);
+
+            border-bottom:
+                1px solid rgba(255, 255, 255, 0.12);
         }}
 
         .topbar h1 {{
-            font-size: 24px;
             margin: 0;
+            font-size: 24px;
+            line-height: 1.3;
         }}
 
         .badge {{
+            flex-shrink: 0;
+
             background: #22c55e;
             color: #04130a;
+
             padding: 8px 14px;
+
             border-radius: 999px;
+
             font-weight: bold;
             font-size: 14px;
         }}
 
         .layout {{
             display: grid;
-            grid-template-columns: 2.2fr 1fr;
+
+            grid-template-columns:
+                minmax(0, 2.2fr)
+                minmax(300px, 1fr);
+
             gap: 18px;
             padding: 18px;
         }}
 
         .panel {{
+            min-width: 0;
+
             background: #111827;
-            border: 1px solid rgba(255,255,255,0.12);
+
+            border:
+                1px solid rgba(255, 255, 255, 0.12);
+
             border-radius: 16px;
-            box-shadow: 0 8px 28px rgba(0,0,0,0.28);
+
+            box-shadow:
+                0 8px 28px rgba(0, 0, 0, 0.28);
+
             overflow: hidden;
         }}
 
         .panel-header {{
+            min-height: 54px;
+
             padding: 14px 18px;
+
             background: #182235;
-            border-bottom: 1px solid rgba(255,255,255,0.10);
+
+            border-bottom:
+                1px solid rgba(255, 255, 255, 0.10);
+
             display: flex;
             align-items: center;
             justify-content: space-between;
+            gap: 12px;
         }}
 
         .panel-header h2 {{
             margin: 0;
             font-size: 18px;
+            line-height: 1.3;
+        }}
+
+        .panel-header span {{
+            color: #94a3b8;
+            font-size: 13px;
         }}
 
         .panel-body {{
             padding: 16px;
+            overflow-x: auto;
         }}
 
-        .video-placeholder {{
+        /* ==============================================================
+           VIDEO GOOGLE DRIVE
+           ============================================================== */
+
+        .video-container {{
+            position: relative;
+
+            width: 100%;
+            padding-top: 56.25%;
+
+            overflow: hidden;
+
             background: #020617;
-            padding: 48px 28px;
-            text-align: center;
+
             border-radius: 14px;
-            border: 1px solid rgba(255,255,255,0.12);
+
+            border:
+                1px solid rgba(255, 255, 255, 0.12);
         }}
 
-        .video-placeholder h2 {{
-            color: white;
-            margin-top: 0;
+        .video-container iframe {{
+            position: absolute;
+            inset: 0;
+
+            width: 100%;
+            height: 100%;
+
+            border: none;
         }}
 
-        .video-placeholder p {{
-            color: #94a3b8;
-            line-height: 1.6;
+        .video-actions {{
+            margin-top: 15px;
+            text-align: center;
         }}
 
         .btn {{
             display: inline-block;
+
             text-decoration: none;
+
             color: white;
             background: #2563eb;
+
             padding: 11px 15px;
-            border-radius: 10px;
-            font-weight: bold;
-            border: 1px solid rgba(255,255,255,0.12);
             margin: 6px;
+
+            border-radius: 10px;
+
+            font-weight: bold;
+            font-size: 14px;
+
+            border:
+                1px solid rgba(255, 255, 255, 0.12);
+
+            transition:
+                transform 0.2s ease,
+                background 0.2s ease;
         }}
 
         .btn:hover {{
             background: #1d4ed8;
+            transform: translateY(-1px);
         }}
 
         .btn-yellow {{
             background: #ca8a04;
         }}
 
+        .btn-yellow:hover {{
+            background: #a16207;
+        }}
+
+        /* ==============================================================
+           METRICS
+           ============================================================== */
+
         .metric-grid {{
             display: grid;
-            grid-template-columns: repeat(2, 1fr);
+            grid-template-columns: repeat(2, minmax(0, 1fr));
             gap: 12px;
         }}
 
         .metric {{
+            min-width: 0;
+
             background: #0f172a;
-            border: 1px solid rgba(255,255,255,0.10);
+
+            border:
+                1px solid rgba(255, 255, 255, 0.10);
+
             border-radius: 14px;
+
             padding: 16px;
         }}
 
         .metric .label {{
             color: #94a3b8;
+
             font-size: 13px;
+
             margin-bottom: 8px;
         }}
 
         .metric .value {{
             font-size: 28px;
             font-weight: bold;
+
             color: #f8fafc;
+
+            overflow-wrap: anywhere;
         }}
 
         .unit {{
             color: #38bdf8;
+
             font-size: 14px;
+
             margin-left: 4px;
         }}
 
@@ -237,10 +610,18 @@ html = f"""
             color: #f87171 !important;
         }}
 
+        /* ==============================================================
+           GRID PHÍA DƯỚI
+           ============================================================== */
+
         .bottom-grid {{
             display: grid;
-            grid-template-columns: repeat(3, 1fr);
+
+            grid-template-columns:
+                repeat(3, minmax(0, 1fr));
+
             gap: 18px;
+
             padding: 0 18px 18px;
         }}
 
@@ -250,14 +631,25 @@ html = f"""
 
         .result-img {{
             width: 100%;
+            height: auto;
+
             border-radius: 10px;
+
             background: white;
-            border: 1px solid rgba(255,255,255,0.10);
+
+            border:
+                1px solid rgba(255, 255, 255, 0.10);
         }}
+
+        /* ==============================================================
+           TABLE
+           ============================================================== */
 
         .data-table {{
             width: 100%;
+
             border-collapse: collapse;
+
             font-size: 13px;
             color: #e5e7eb;
         }}
@@ -265,56 +657,113 @@ html = f"""
         .data-table th {{
             background: #1e293b;
             color: #93c5fd;
-            padding: 9px;
-            border: 1px solid rgba(255,255,255,0.12);
+
+            padding: 10px;
+
+            border:
+                1px solid rgba(255, 255, 255, 0.12);
+
             text-align: left;
+            white-space: nowrap;
         }}
 
         .data-table td {{
-            padding: 8px;
-            border: 1px solid rgba(255,255,255,0.10);
+            padding: 9px;
+
+            border:
+                1px solid rgba(255, 255, 255, 0.10);
+
+            white-space: nowrap;
         }}
 
-        .data-table tr:nth-child(even) {{
+        .data-table tbody tr:nth-child(even) {{
             background: #0f172a;
         }}
 
+        .data-table tbody tr:hover {{
+            background: #172033;
+        }}
+
+        /* ==============================================================
+           EVIDENCE
+           ============================================================== */
+
         .evidence-grid {{
             display: grid;
-            grid-template-columns: repeat(4, 1fr);
+
+            grid-template-columns:
+                repeat(4, minmax(0, 1fr));
+
             gap: 14px;
         }}
 
         .evidence-card {{
+            min-width: 0;
+
             background: #0f172a;
-            border: 1px solid rgba(255,255,255,0.10);
+
+            border:
+                1px solid rgba(255, 255, 255, 0.10);
+
             border-radius: 12px;
+
             padding: 10px;
         }}
 
         .evidence-card img {{
             width: 100%;
+            height: 180px;
+
+            object-fit: cover;
+
             border-radius: 8px;
         }}
 
         .evidence-card p {{
+            margin-bottom: 0;
+
             font-size: 11px;
             color: #94a3b8;
+
             word-break: break-all;
         }}
 
         .note {{
             color: #94a3b8;
+
             line-height: 1.6;
+        }}
+
+        .empty-message {{
+            margin: 0;
+
+            padding: 18px;
+
+            text-align: center;
+
+            color: #94a3b8;
+            background: #0f172a;
+
+            border:
+                1px dashed rgba(255, 255, 255, 0.16);
+
+            border-radius: 10px;
         }}
 
         .footer {{
             text-align: center;
+
             padding: 24px;
+
             color: #94a3b8;
         }}
 
+        /* ==============================================================
+           RESPONSIVE
+           ============================================================== */
+
         @media (max-width: 1000px) {{
+
             .layout {{
                 grid-template-columns: 1fr;
             }}
@@ -324,11 +773,38 @@ html = f"""
             }}
 
             .evidence-grid {{
-                grid-template-columns: repeat(2, 1fr);
+                grid-template-columns:
+                    repeat(2, minmax(0, 1fr));
             }}
         }}
 
         @media (max-width: 600px) {{
+
+            .topbar {{
+                align-items: flex-start;
+                flex-direction: column;
+
+                padding: 16px;
+            }}
+
+            .topbar h1 {{
+                font-size: 20px;
+            }}
+
+            .layout {{
+                padding: 12px;
+            }}
+
+            .bottom-grid {{
+                padding:
+                    0 12px 12px;
+            }}
+
+            .full-width {{
+                padding:
+                    0 12px 12px;
+            }}
+
             .metric-grid {{
                 grid-template-columns: 1fr;
             }}
@@ -336,221 +812,581 @@ html = f"""
             .evidence-grid {{
                 grid-template-columns: 1fr;
             }}
+
+            .metric .value {{
+                font-size: 24px;
+            }}
         }}
+
     </style>
+
 </head>
+
 
 <body>
 
-    <div class="topbar">
-        <h1>🚦 Traffic Speed Violation Monitoring Dashboard</h1>
-        <div class="badge">WEB DEMO ONLINE</div>
-    </div>
+    <!-- ==============================================================
+         TOP BAR
+         ============================================================== -->
 
-    <div class="layout">
+    <header class="topbar">
 
-        <div class="panel">
-            <div class="panel-header">
-                <h2>🎥 Video Demo - Detection + Tracking + Speed</h2>
-                <span>YOLO + ByteTrack</span>
-            </div>
+        <h1>
+            🚦 Traffic Speed Violation Monitoring Dashboard
+        </h1>
 
-            <div class="panel-body">
-                <div class="video-placeholder">
-                    <h2>🎥 Video Demo Hệ Thống</h2>
-                    <p>
-                        Video demo đã được xử lý bằng mô hình YOLO + ByteTrack.
-                        Video hiển thị Bounding Box, Track ID, tốc độ ước lượng và cảnh báo vi phạm.
+        <div class="badge">
+            WEB DEMO ONLINE
+        </div>
+
+    </header>
+
+
+    <!-- ==============================================================
+         VIDEO VÀ SUMMARY
+         ============================================================== -->
+
+    <main>
+
+        <section class="layout">
+
+            <!-- VIDEO -->
+
+            <article class="panel">
+
+                <div class="panel-header">
+
+                    <h2>
+                        🎥 Video Demo - Detection + Tracking + Speed
+                    </h2>
+
+                    <span>
+                        YOLO + ByteTrack
+                    </span>
+
+                </div>
+
+                <div class="panel-body">
+
+                    <div class="video-container">
+
+                        <iframe
+                            src="{GOOGLE_DRIVE_VIDEO_EMBED}"
+                            title="Video Demo Traffic Speed Violation"
+                            allow="autoplay; fullscreen"
+                            allowfullscreen>
+                        </iframe>
+
+                    </div>
+
+                    <div class="video-actions">
+
+                        <a
+                            class="btn"
+                            href="{GOOGLE_DRIVE_VIDEO_LINK}"
+                            target="_blank"
+                            rel="noopener noreferrer">
+                            ▶ Mở video trên Google Drive
+                        </a>
+
+                        <a
+                            class="btn btn-yellow"
+                            href="assets/speed_violation_results.csv"
+                            download>
+                            ⬇ Tải CSV kết quả
+                        </a>
+
+                    </div>
+
+                    <p class="note">
+                        Video demo đã được xử lý bằng mô hình YOLO
+                        kết hợp ByteTrack. Video hiển thị Bounding Box,
+                        Track ID, tốc độ ước lượng và cảnh báo phương tiện
+                        vượt quá tốc độ giới hạn.
                     </p>
-                    <a class="btn" href="{GOOGLE_DRIVE_VIDEO_LINK}" target="_blank">▶ Xem video demo trên Google Drive</a>
-                    <a class="btn btn-yellow" href="assets/speed_violation_results.csv" download>⬇ Tải CSV kết quả</a>
+
+                    <p class="note">
+                        Đây là dashboard tĩnh được triển khai trên GitHub Pages.
+                        Website vẫn hoạt động sau khi tắt Google Colab.
+                    </p>
+
                 </div>
 
-                <p class="note">
-                    Web này là dashboard tĩnh nên vẫn hoạt động sau khi tắt Colab hoặc tắt code.
-                    Phần xử lý YOLO được thực hiện trước, sau đó kết quả được đưa lên giao diện web.
-                </p>
-            </div>
-        </div>
+            </article>
 
-        <div class="panel">
-            <div class="panel-header">
-                <h2>📊 Summary</h2>
-                <span>Result</span>
-            </div>
 
-            <div class="panel-body">
-                <div class="metric-grid">
-                    <div class="metric">
-                        <div class="label">Tổng Track ID</div>
-                        <div class="value">{total_ids}</div>
-                    </div>
+            <!-- SUMMARY -->
 
-                    <div class="metric">
-                        <div class="label">Xe đo tốc độ</div>
-                        <div class="value">{total_measured}</div>
-                    </div>
+            <article class="panel">
 
-                    <div class="metric">
-                        <div class="label">Xe vi phạm</div>
-                        <div class="value danger">{total_violations}</div>
-                    </div>
+                <div class="panel-header">
 
-                    <div class="metric">
-                        <div class="label">Tỷ lệ vi phạm</div>
-                        <div class="value danger">{violation_rate}<span class="unit">%</span></div>
-                    </div>
+                    <h2>
+                        📊 Summary
+                    </h2>
 
-                    <div class="metric">
-                        <div class="label">FPS xử lý</div>
-                        <div class="value">{real_fps}<span class="unit">FPS</span></div>
-                    </div>
+                    <span>
+                        Result
+                    </span>
 
-                    <div class="metric">
-                        <div class="label">Speed Limit</div>
-                        <div class="value">{speed_limit:.0f}<span class="unit">km/h</span></div>
-                    </div>
-
-                    <div class="metric">
-                        <div class="label">Tốc độ TB</div>
-                        <div class="value">{avg_speed}<span class="unit">km/h</span></div>
-                    </div>
-
-                    <div class="metric">
-                        <div class="label">Tốc độ Max</div>
-                        <div class="value danger">{max_speed}<span class="unit">km/h</span></div>
-                    </div>
                 </div>
 
-                <p class="note">
-                    Khoảng cách giả định giữa hai vạch ảo: <b>{distance_m:.1f} m</b>.
-                </p>
-            </div>
-        </div>
+                <div class="panel-body">
 
-    </div>
+                    <div class="metric-grid">
 
-    <div class="bottom-grid">
+                        <div class="metric">
+                            <div class="label">
+                                Tổng Track ID
+                            </div>
+                            <div class="value">
+                                {total_ids}
+                            </div>
+                        </div>
 
-        <div class="panel">
-            <div class="panel-header">
-                <h2>🚗 Vehicle Class</h2>
-            </div>
-            <div class="panel-body">
-                <img src="assets/demo_class_count.png" class="result-img" alt="Class Count">
-            </div>
-        </div>
+                        <div class="metric">
+                            <div class="label">
+                                Xe đã đo tốc độ
+                            </div>
+                            <div class="value">
+                                {total_measured}
+                            </div>
+                        </div>
 
-        <div class="panel">
-            <div class="panel-header">
-                <h2>⚡ Speed Distribution</h2>
-            </div>
-            <div class="panel-body">
-                <img src="assets/demo_speed_distribution.png" class="result-img" alt="Speed Distribution">
-            </div>
-        </div>
+                        <div class="metric">
+                            <div class="label">
+                                Xe vi phạm
+                            </div>
+                            <div class="value danger">
+                                {total_violations}
+                            </div>
+                        </div>
 
-        <div class="panel">
-            <div class="panel-header">
-                <h2>🚨 Violation Count</h2>
-            </div>
-            <div class="panel-body">
-                <img src="assets/demo_violation_count.png" class="result-img" alt="Violation Count">
-            </div>
-        </div>
+                        <div class="metric">
+                            <div class="label">
+                                Tỷ lệ vi phạm
+                            </div>
+                            <div class="value danger">
+                                {violation_rate}
+                                <span class="unit">
+                                    %
+                                </span>
+                            </div>
+                        </div>
 
-    </div>
+                        <div class="metric">
+                            <div class="label">
+                                FPS xử lý
+                            </div>
+                            <div class="value">
+                                {real_fps:.2f}
+                                <span class="unit">
+                                    FPS
+                                </span>
+                            </div>
+                        </div>
 
-    <div class="full-width">
-        <div class="panel">
-            <div class="panel-header">
-                <h2>📋 Latest Speed Logs</h2>
-            </div>
-            <div class="panel-body">
-                {latest_html}
-            </div>
-        </div>
-    </div>
+                        <div class="metric">
+                            <div class="label">
+                                Giới hạn tốc độ
+                            </div>
+                            <div class="value">
+                                {speed_limit:.0f}
+                                <span class="unit">
+                                    km/h
+                                </span>
+                            </div>
+                        </div>
 
-    <div class="full-width">
-        <div class="panel">
-            <div class="panel-header">
-                <h2>📌 Class Evaluation Summary</h2>
-            </div>
-            <div class="panel-body">
-                {class_table_html}
-            </div>
-        </div>
-    </div>
+                        <div class="metric">
+                            <div class="label">
+                                Tốc độ trung bình
+                            </div>
+                            <div class="value">
+                                {avg_speed}
+                                <span class="unit">
+                                    km/h
+                                </span>
+                            </div>
+                        </div>
 
-    <div class="bottom-grid">
+                        <div class="metric">
+                            <div class="label">
+                                Tốc độ lớn nhất
+                            </div>
+                            <div class="value danger">
+                                {max_speed}
+                                <span class="unit">
+                                    km/h
+                                </span>
+                            </div>
+                        </div>
 
-        <div class="panel">
-            <div class="panel-header">
-                <h2>🧩 Confusion Matrix</h2>
-            </div>
-            <div class="panel-body">
-                <img src="assets/confusion_matrix.png" class="result-img" alt="Confusion Matrix">
-            </div>
-        </div>
+                    </div>
 
-        <div class="panel">
-            <div class="panel-header">
-                <h2>📈 PR Curve</h2>
-            </div>
-            <div class="panel-body">
-                <img src="assets/PR_curve.png" class="result-img" alt="PR Curve">
-            </div>
-        </div>
+                    <p class="note">
+                        Khoảng cách giả định giữa hai vạch ảo:
+                        <strong>{distance_m:.1f} m</strong>.
+                    </p>
 
-        <div class="panel">
-            <div class="panel-header">
-                <h2>📉 F1 Curve</h2>
-            </div>
-            <div class="panel-body">
-                <img src="assets/F1_curve.png" class="result-img" alt="F1 Curve">
-            </div>
-        </div>
-
-    </div>
-
-    <div class="full-width">
-        <div class="panel">
-            <div class="panel-header">
-                <h2>📸 Evidence Capture</h2>
-            </div>
-            <div class="panel-body">
-                <div class="evidence-grid">
-                    {evidence_html}
                 </div>
-            </div>
-        </div>
-    </div>
 
-    <div class="full-width">
-        <div class="panel">
-            <div class="panel-header">
-                <h2>📝 Mô tả hệ thống</h2>
-            </div>
-            <div class="panel-body">
-                <p class="note">
-                    Hệ thống sử dụng YOLO để phát hiện phương tiện, ByteTrack để gán ID theo thời gian.
-                    Khi phương tiện đi qua LINE_A và LINE_B, hệ thống tính thời gian di chuyển để ước lượng tốc độ.
-                    Nếu tốc độ vượt ngưỡng, phương tiện được đánh dấu vi phạm và lưu vào CSV cùng ảnh bằng chứng.
-                </p>
-            </div>
-        </div>
-    </div>
+            </article>
 
-    <div class="footer">
-        Đồ án Thị giác máy tính - Intelligent Transportation System
-    </div>
+        </section>
+
+
+        <!-- ==========================================================
+             BIỂU ĐỒ DEMO
+             ========================================================== -->
+
+        <section class="bottom-grid">
+
+            <article class="panel">
+
+                <div class="panel-header">
+                    <h2>🚗 Vehicle Class</h2>
+                </div>
+
+                <div class="panel-body">
+                    <img
+                        src="assets/demo_class_count.png"
+                        class="result-img"
+                        alt="Biểu đồ số lượng phương tiện theo lớp"
+                        loading="lazy"
+                    >
+                </div>
+
+            </article>
+
+
+            <article class="panel">
+
+                <div class="panel-header">
+                    <h2>⚡ Speed Distribution</h2>
+                </div>
+
+                <div class="panel-body">
+                    <img
+                        src="assets/demo_speed_distribution.png"
+                        class="result-img"
+                        alt="Biểu đồ phân bố tốc độ"
+                        loading="lazy"
+                    >
+                </div>
+
+            </article>
+
+
+            <article class="panel">
+
+                <div class="panel-header">
+                    <h2>🚨 Violation Count</h2>
+                </div>
+
+                <div class="panel-body">
+                    <img
+                        src="assets/demo_violation_count.png"
+                        class="result-img"
+                        alt="Biểu đồ số lượng vi phạm"
+                        loading="lazy"
+                    >
+                </div>
+
+            </article>
+
+        </section>
+
+
+        <!-- ==========================================================
+             SPEED LOGS
+             ========================================================== -->
+
+        <section class="full-width">
+
+            <article class="panel">
+
+                <div class="panel-header">
+                    <h2>📋 Latest Speed Logs</h2>
+                </div>
+
+                <div class="panel-body">
+                    {latest_html}
+                </div>
+
+            </article>
+
+        </section>
+
+
+        <!-- ==========================================================
+             CLASS EVALUATION
+             ========================================================== -->
+
+        <section class="full-width">
+
+            <article class="panel">
+
+                <div class="panel-header">
+                    <h2>📌 Class Evaluation Summary</h2>
+                </div>
+
+                <div class="panel-body">
+                    {class_table_html}
+                </div>
+
+            </article>
+
+        </section>
+
+
+        <!-- ==========================================================
+             KẾT QUẢ ĐÁNH GIÁ MÔ HÌNH
+             ========================================================== -->
+
+        <section class="bottom-grid">
+
+            <article class="panel">
+
+                <div class="panel-header">
+                    <h2>🧩 Confusion Matrix</h2>
+                </div>
+
+                <div class="panel-body">
+                    <img
+                        src="assets/confusion_matrix.png"
+                        class="result-img"
+                        alt="Confusion Matrix"
+                        loading="lazy"
+                    >
+                </div>
+
+            </article>
+
+
+            <article class="panel">
+
+                <div class="panel-header">
+                    <h2>📈 PR Curve</h2>
+                </div>
+
+                <div class="panel-body">
+                    <img
+                        src="assets/PR_curve.png"
+                        class="result-img"
+                        alt="Precision Recall Curve"
+                        loading="lazy"
+                    >
+                </div>
+
+            </article>
+
+
+            <article class="panel">
+
+                <div class="panel-header">
+                    <h2>📉 F1 Curve</h2>
+                </div>
+
+                <div class="panel-body">
+                    <img
+                        src="assets/F1_curve.png"
+                        class="result-img"
+                        alt="F1 Confidence Curve"
+                        loading="lazy"
+                    >
+                </div>
+
+            </article>
+
+        </section>
+
+
+        <!-- ==========================================================
+             ẢNH BẰNG CHỨNG
+             ========================================================== -->
+
+        <section class="full-width">
+
+            <article class="panel">
+
+                <div class="panel-header">
+                    <h2>📸 Evidence Capture</h2>
+                </div>
+
+                <div class="panel-body">
+
+                    <div class="evidence-grid">
+                        {evidence_html}
+                    </div>
+
+                </div>
+
+            </article>
+
+        </section>
+
+
+        <!-- ==========================================================
+             MÔ TẢ HỆ THỐNG
+             ========================================================== -->
+
+        <section class="full-width">
+
+            <article class="panel">
+
+                <div class="panel-header">
+                    <h2>📝 Mô tả hệ thống</h2>
+                </div>
+
+                <div class="panel-body">
+
+                    <p class="note">
+                        Hệ thống sử dụng YOLO để phát hiện ô tô và xe máy,
+                        sau đó sử dụng ByteTrack để gán mã định danh
+                        Track ID cho từng phương tiện qua các khung hình.
+                    </p>
+
+                    <p class="note">
+                        Khi phương tiện lần lượt đi qua LINE_A và LINE_B,
+                        hệ thống ghi nhận thời gian di chuyển và ước lượng
+                        tốc độ dựa trên khoảng cách thực tế giữa hai vạch.
+                        Nếu tốc độ vượt ngưỡng cho phép, phương tiện được
+                        đánh dấu vi phạm, lưu thông tin vào CSV và lưu ảnh
+                        bằng chứng.
+                    </p>
+
+                </div>
+
+            </article>
+
+        </section>
+
+    </main>
+
+
+    <!-- ==============================================================
+         FOOTER
+         ============================================================== -->
+
+    <footer class="footer">
+        Đồ án Thị giác máy tính -
+        Intelligent Transportation System
+    </footer>
 
 </body>
+
 </html>
 """
 
-index_path.write_text(html, encoding="utf-8")
 
-print("Đã tạo index.html:")
-print(index_path)
+# ==============================================================================
+# 12. GHI FILE INDEX.HTML
+# ==============================================================================
+
+INDEX_PATH.write_text(
+    html.strip(),
+    encoding="utf-8"
+)
+
+
+# ==============================================================================
+# 13. KIỂM TRA FILE SAU KHI TẠO
+# ==============================================================================
+
+print()
+print("=" * 100)
+print("ĐÃ TẠO INDEX.HTML THÀNH CÔNG")
+print("=" * 100)
+
+print("Đường dẫn:")
+print(INDEX_PATH)
+
+print()
+print(
+    "Dung lượng:",
+    round(INDEX_PATH.stat().st_size / 1024, 2),
+    "KB"
+)
+
+html_preview = INDEX_PATH.read_text(
+    encoding="utf-8"
+)[:500]
+
+print()
+print("-" * 100)
+print("500 KÝ TỰ ĐẦU CỦA FILE INDEX.HTML")
+print("-" * 100)
+print(html_preview)
+
+print()
+print("-" * 100)
+print("KIỂM TRA ĐỊNH DẠNG")
+print("-" * 100)
+
+if html_preview.lstrip().startswith("<!DOCTYPE html>"):
+
+    print("✅ INDEX.HTML ĐÚNG ĐỊNH DẠNG")
+    print("✅ File bắt đầu bằng <!DOCTYPE html>")
+    print("✅ Có thể tải file này lên GitHub Pages")
+
+else:
+
+    print("❌ INDEX.HTML KHÔNG ĐÚNG ĐỊNH DẠNG")
+    print("❌ Không được upload file này lên GitHub")
+
+
+# ==============================================================================
+# 14. KIỂM TRA CÁC ASSET CẦN THIẾT
+# ==============================================================================
+
+required_assets = [
+    "demo_summary.csv",
+    "speed_violation_results.csv",
+    "class_evaluation_summary.csv",
+    "demo_class_count.png",
+    "demo_speed_distribution.png",
+    "demo_violation_count.png",
+    "confusion_matrix.png",
+    "PR_curve.png",
+    "F1_curve.png"
+]
+
+print()
+print("-" * 100)
+print("KIỂM TRA ASSETS")
+print("-" * 100)
+
+for asset_name in required_assets:
+
+    asset_path = ASSETS_DIR / asset_name
+
+    if asset_path.exists():
+
+        file_size_kb = (
+            asset_path.stat().st_size / 1024
+        )
+
+        print(
+            f"✅ {asset_name:<40} "
+            f"{file_size_kb:>10.2f} KB"
+        )
+
+    else:
+
+        print(
+            f"❌ {asset_name:<40} "
+            f"KHÔNG TỒN TẠI"
+        )
+
+
+print()
+print("=" * 100)
+print("HOÀN THÀNH PHASE 8.2")
+print("=" * 100)
+print()
+print("LƯU Ý:")
+print("1. Chạy đoạn code này trong ô Code của Google Colab.")
+print("2. Không dán đoạn Python này trực tiếp vào file index.html trên GitHub.")
+print("3. Chỉ upload file index.html đã được tạo và thư mục assets.")
+print("4. Video Google Drive phải bật quyền: Bất kỳ ai có đường liên kết.")
